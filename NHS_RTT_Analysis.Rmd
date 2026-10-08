@@ -1,0 +1,1643 @@
+---
+title: "NHS Waiting List and Service Performance Analysis"
+author: "Asif Khandokar"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+---
+
+# 0. Project Overview
+
+## 0.1 Project Aim
+
+This project analyses NHS England referral-to-treatment (RTT)
+waiting-list data for three London NHS trusts between April 2024
+and March 2026.
+
+The aim is to examine changes in waiting-list size and waiting
+times, compare selected specialties, and identify patterns
+that warrant further investigation.
+
+## 0.2 Research Questions
+
+1. How have waiting-list sizes changed over the study period?
+2. How have the percentages of pathways within 18 weeks and
+   over 52 weeks changed?
+3. Which selected specialties show increasing waiting lists
+   or persistent long waits?
+4. What differences between trusts warrant further investigation?
+
+## 0.3 Project Scope
+
+The selected trusts are:
+
+- Barts Health NHS Trust (R1H).
+- Imperial College Healthcare NHS Trust (RYJ).
+- Guy's and St Thomas' NHS Foundation Trust (RJ1).
+
+The selected specialties are:
+
+- General Surgery Service (C_100).
+- Trauma and Orthopaedic Service (C_110).
+- Ophthalmology Service (C_130).
+
+The data describe incomplete RTT pathways at the end of each
+reporting month. Pathways are not necessarily unique patients,
+because one patient can have more than one pathway.
+
+# 1. Background and NHS Context
+
+## 1.1 What Is Referral to Treatment?
+
+Referral to Treatment (RTT) measures the time from referral
+to the start of consultant-led treatment for non-emergency care.
+
+An incomplete RTT pathway represents a case where treatment
+has not yet started at the end of the reporting month.
+The patient may be waiting for a diagnostic test, a specialist
+appointment or a procedure.
+
+A patient can have more than one pathway for different
+conditions. Therefore, pathway counts should not be interpreted
+as counts of unique patients.
+
+## 1.2 Why Analyse Waiting Lists?
+
+Waiting-list analysis helps service managers understand
+changes in the number of pathways awaiting treatment and
+the length of time people have been waiting.
+
+Examining trends by trust and specialty can identify areas
+that need further investigation. However, waiting-list data
+alone cannot establish why performance has changed.
+
+## 1.3 Measures Used in This Project
+
+This project will examine:
+
+- Total incomplete pathways: the waiting-list size at month-end.
+- Percentage within 18 weeks: the proportion of incomplete
+  pathways with a wait of no more than 18 weeks.
+- Pathways waiting over 52 weeks: the number and proportion
+  experiencing long waits.
+- Median waiting time: the middle waiting time among
+  incomplete pathways, as published in the dataset.
+- Monthly and annual changes: movements in waiting-list
+  size and waiting-time indicators.
+
+## 1.4 Interpreting Comparisons
+
+Trusts differ in size, services and the complexity of the
+patients they treat. A larger waiting list does not, by itself,
+indicate poorer performance.
+
+This project compares the same selected specialties across
+trusts and examines both counts and percentages. Differences
+will be described as patterns requiring investigation rather
+than evidence of their underlying causes.
+
+Monthly waiting lists are snapshots. Adding their totals
+across months would not give the number of distinct patients
+or pathways seen during the study period.
+
+## 1.5 Source
+
+NHS England:
+[Referral to Treatment Waiting Times — Data Collection](https://digital.nhs.uk/data-and-information/data-collections-and-data-sets/data-collections/consultant-led-referral-to-treatment-waiting-times-rtt).
+
+# 2. Data Source and Definitions
+
+## 2.1 Data Source
+
+The data come from NHS England's monthly Consultant-led
+Referral to Treatment (RTT) Waiting Times publications.
+
+This project uses the "Provider" sheet from 24 monthly
+"Incomplete Provider" Excel workbooks covering April 2024
+to March 2026.
+
+The source publication pages are:
+
+- [RTT Data 2024–25](https://www.england.nhs.uk/statistics/statistical-work-areas/rtt-waiting-times/rtt-data-2024-25/)
+- [RTT Data 2025–26](https://www.england.nhs.uk/statistics/statistical-work-areas/rtt-waiting-times/rtt-data-2025-26/)
+
+Original workbooks are retained unchanged in the data folder.
+Their filenames identify the reporting month and, where
+indicated, whether the file is revised.
+
+## 2.2 Selected Trusts and Specialties
+
+The analysis focuses on three London NHS trusts:
+
+| Provider code | NHS trust |
+|:--------------|:----------|
+| R1H | Barts Health NHS Trust |
+| RYJ | Imperial College Healthcare NHS Trust |
+| RJ1 | Guy's and St Thomas' NHS Foundation Trust |
+
+Three specialties are selected:
+
+| Treatment function code | Specialty |
+|:------------------------|:----------|
+| C_100 | General Surgery Service |
+| C_110 | Trauma and Orthopaedic Service |
+| C_130 | Ophthalmology Service |
+
+These specialties are recorded for all three trusts throughout
+the selected period. Reporting coverage and missing values
+will also be checked within the R workflow.
+
+## 2.3 Unit of Analysis
+
+Each observation in the prepared specialty dataset will
+represent one trust, one specialty and one reporting month.
+
+The expected dataset contains:
+
+24 months × 3 trusts × 3 specialties = 216 observations.
+
+These are aggregated observations, rather than individual
+patient records.
+
+## 2.4 Variable Dictionary
+
+| Prepared variable | Meaning | Type |
+|:------------------|:--------|:-----|
+| reporting_month | Reporting month, stored as its first day; measures describe month-end | Date |
+| provider_code | Identifier for the NHS trust | Character |
+| provider_name | Name of the NHS trust | Character |
+| specialty_code | Published treatment function code | Character |
+| specialty_name | Published treatment function name | Character |
+| total_pathways | Total incomplete pathways at month-end | Numeric count |
+| within_18_weeks | Number of incomplete pathways within 18 weeks | Numeric count |
+| pct_within_18_weeks | Published proportion of incomplete pathways within 18 weeks | Numeric proportion (0–1) |
+| over_52_weeks | Published "Total 52 plus weeks" count | Numeric count |
+| pct_over_52_weeks | Proportion calculated as over_52_weeks / total_pathways | Numeric proportion (0–1) |
+| median_wait_weeks | Published median waiting time in weeks, converted to numeric during cleaning | Numeric |
+| source_file | Original workbook filename | Character |
+
+These shorter names are assigned during data preparation.
+Proportions are multiplied by 100 when displayed as percentages
+in tables and charts.
+
+## 2.5 Percentage Representation
+
+Excel stores the percentage measures as proportions.
+
+For example, a stored value of 0.65 represents 65%.
+
+We will retain proportions for calculations and format them
+as percentages in tables and charts. A change from 60% to
+65% is an increase of 5 percentage points.
+
+## 2.6 Workbook Structure
+
+In the March 2026 Provider sheet, the column headings appear
+on row 14 and the data begin on row 15.
+
+The workbooks contain weekly waiting-time bands alongside
+published summary measures. Column headings vary slightly
+across the collected files, so the import process will check
+and standardise them.
+
+Each trust also has a "Total" row with treatment function
+code C_999. These rows will be kept separate from specialty
+records to prevent double-counting.
+
+The sum of our three selected specialties will be labelled
+as a selected-specialty total, rather than the whole trust's
+waiting list.
+
+## 2.7 Initial Data Quality Checks
+
+Before analysis, the workflow will check:
+
+- All 24 reporting months are present.
+- Each trust–specialty–month combination is unique.
+- Required measures are numeric and available.
+- Pathway counts are non-negative whole numbers.
+- Counts within 18 weeks and over 52 weeks do not exceed
+  total pathways.
+- Published proportions agree with their corresponding
+  counts and totals, allowing for numerical precision.
+- Missing values remain distinguishable from zero.
+
+The presence of a record does not guarantee that it is
+complete or accurate. Any issues will be investigated and
+documented before interpreting the results.
+
+# 3. R Setup and Data Import
+
+## 3.1 Load Packages
+
+Packages provide functions for importing Excel files,
+preparing data and creating visualisations.
+
+```{r load-packages}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## 3.2 Locate the Monthly Workbooks
+
+The original Excel workbooks are stored in the project's
+data folder. We search for Incomplete Provider files,
+including any stored in subfolders.
+
+```{r locate-files}
+# Find the monthly Provider workbooks.
+rtt_files <- list.files(
+  path = "data",
+  pattern = "^Incomplete-Provider-.*\\.xlsx$",
+  full.names = TRUE,
+  recursive = TRUE,
+  ignore.case = TRUE
+)
+
+# Check the number of files found.
+length(rtt_files)
+
+# Display their filenames.
+basename(rtt_files)
+```
+
+The expected number of workbooks is 24. Finding 24 files
+is an initial check; we will verify their reporting months
+after importing them.
+
+## 3.3 Import One Workbook
+
+We first import a single workbook to understand its structure
+before combining all 24 months.
+
+```{r import-sample}
+# Locate the March 2026 workbook.
+sample_file <- rtt_files[
+  grepl("Incomplete-Provider-Mar26-", basename(rtt_files))
+]
+
+# Confirm exactly one matching file.
+stopifnot(length(sample_file) == 1)
+
+# Display the workbook's sheet names.
+excel_sheets(sample_file)
+
+# Import the Provider sheet.
+# Skip the first 13 rows so row 14 becomes the column headings.
+rtt_sample <- read_excel(
+  path = sample_file,
+  sheet = "Provider",
+  skip = 13
+)
+```
+
+## 3.4 Inspect the Imported Data
+
+We examine the dimensions, column names and first few records
+to check whether the import has worked as expected.
+
+```{r inspect-sample}
+# Number of rows and columns.
+dim(rtt_sample)
+
+# Original column names.
+names(rtt_sample)
+
+# Display the first six records using the identifier columns.
+head(
+  rtt_sample %>%
+    select(
+      `Provider Code`,
+      `Provider Name`,
+      `Treatment Function Code`,
+      `Treatment Function`
+    )
+)
+```
+
+## 3.5 Select the Project Sample
+
+We use provider and specialty codes to select the records
+relevant to the project. Codes provide more consistent
+identifiers than organisation names.
+
+```{r select-sample}
+# Define the three trusts.
+selected_trusts <- c("R1H", "RYJ", "RJ1")
+
+# Define the three specialties.
+selected_specialties <- c("C_100", "C_110", "C_130")
+
+# Select the relevant records and give columns shorter names.
+rtt_sample_selected <- rtt_sample %>%
+  filter(
+    `Provider Code` %in% selected_trusts,
+    `Treatment Function Code` %in% selected_specialties
+  ) %>%
+  transmute(
+    provider_code = `Provider Code`,
+    provider_name = `Provider Name`,
+    specialty_code = `Treatment Function Code`,
+    specialty_name = `Treatment Function`,
+    total_pathways = `Total number of incomplete pathways`,
+    within_18_weeks = `Total within 18 weeks`,
+    pct_within_18_weeks = `% within 18 weeks`,
+    over_52_weeks = `Total 52 plus weeks`,
+    pct_over_52_weeks = `% 52 plus weeks`,
+    median_wait_weeks = `Average (median) waiting time (in weeks)`
+  )
+
+# Check the number of selected records.
+nrow(rtt_sample_selected)
+
+# Display a compact table.
+knitr::kable(
+  rtt_sample_selected %>%
+    select(
+      provider_code,
+      specialty_name,
+      total_pathways,
+      within_18_weeks,
+      over_52_weeks
+    ),
+  caption = "Selected trust and specialty records: March 2026"
+)
+```
+
+## 3.6 Create a Monthly Import Function
+
+A function lets us apply the same preparation steps to every
+workbook without copying the code 24 times.
+
+We read the reporting period from cell C5, rather than relying
+only on the filename. Dates are stored as the first day of
+the reporting month for sorting and plotting; the measures
+describe the month-end waiting list.
+
+```{r monthly-import-function}
+read_rtt_month <- function(file_path) {
+
+  # Read the reporting period from the workbook.
+  period_text <- read_excel(
+    file_path,
+    sheet = "Provider",
+    range = "C5",
+    col_names = FALSE
+  )[[1]][1]
+
+  # Convert the month name and year into a Date.
+  period_parts <- strsplit(trimws(period_text), "\\s+")[[1]]
+  month_number <- match(period_parts[1], month.name)
+  year_number <- as.integer(period_parts[2])
+
+  if (is.na(month_number) || is.na(year_number)) {
+    stop("Could not identify reporting month: ", basename(file_path))
+  }
+
+  reporting_month <- as.Date(
+    sprintf("%04d-%02d-01", year_number, month_number)
+  )
+
+  # Read the monthly Provider data.
+  monthly_data <- read_excel(
+    file_path,
+    sheet = "Provider",
+    skip = 13
+  )
+
+  # Select the project records and standardise column names.
+  selected_data <- monthly_data %>%
+    filter(
+      `Provider Code` %in% selected_trusts,
+      `Treatment Function Code` %in% selected_specialties
+    ) %>%
+    transmute(
+      reporting_month = reporting_month,
+      provider_code = `Provider Code`,
+      provider_name = `Provider Name`,
+      specialty_code = `Treatment Function Code`,
+      specialty_name = `Treatment Function`,
+      total_pathways = `Total number of incomplete pathways`,
+      within_18_weeks = `Total within 18 weeks`,
+      pct_within_18_weeks = `% within 18 weeks`,
+      over_52_weeks = `Total 52 plus weeks`,
+      median_wait_weeks = `Average (median) waiting time (in weeks)`,
+      source_file = basename(file_path)
+    ) %>%
+    mutate(
+      pct_over_52_weeks = over_52_weeks /
+        na_if(total_pathways, 0)
+    )
+
+  return(selected_data)
+}
+```
+
+## 3.7 Combine All Monthly Files
+
+The lapply() function runs our import function once for each
+workbook. bind_rows() combines the resulting tables.
+
+```{r combine-months}
+# Import each workbook into a list of monthly tables.
+rtt_monthly_list <- lapply(rtt_files, read_rtt_month)
+
+# Combine and sort the records.
+rtt_data <- bind_rows(rtt_monthly_list) %>%
+  arrange(reporting_month, provider_code, specialty_code)
+
+# Check the combined dataset.
+nrow(rtt_data)
+n_distinct(rtt_data$reporting_month)
+range(rtt_data$reporting_month)
+
+# Check the number of records in each month.
+knitr::kable(
+  rtt_data %>% count(reporting_month, name = "records"),
+  caption = "Number of selected records per reporting month"
+)
+```
+
+# 4. Initial Data Inspection
+
+## 4.1 Inspect Dimensions and Variable Types
+
+We check the size and structure of the combined dataset.
+Dates, identifiers and numerical measures should have
+appropriate types before analysis.
+
+```{r inspect-combined-data}
+# Number of rows and columns.
+dim(rtt_data)
+
+# Display each variable's type and sample values.
+glimpse(rtt_data)
+```
+
+## 4.2 Summarise Numerical Measures
+
+Summary statistics provide an initial view of the ranges
+and distributions. They can also reveal missing values
+or unexpected measurements.
+
+```{r summarise-measures}
+rtt_data %>%
+  select(
+    total_pathways,
+    within_18_weeks,
+    pct_within_18_weeks,
+    over_52_weeks,
+    pct_over_52_weeks,
+    median_wait_weeks
+  ) %>%
+  summary()
+```
+
+## 4.3 Check Coverage by Trust and Specialty
+
+Each trust–specialty combination should have 24 records,
+one for each reporting month. Duplicate and missing-month
+checks will follow in Section 5.
+
+```{r inspect-group-coverage}
+knitr::kable(
+  rtt_data %>%
+    count(provider_code, specialty_code, specialty_name,
+          name = "records"),
+  caption = "Record counts by trust and specialty"
+)
+```
+
+# 5. Data Cleaning and Quality Assurance
+
+## 5.1 Correct the Median Waiting-Time Type
+
+The median waiting-time column was imported as text.
+We convert it to numeric and check whether any non-missing
+values fail conversion.
+
+```{r convert-median-wait}
+# Retain the original values for checking.
+median_wait_original <- rtt_data$median_wait_weeks
+
+# Convert text values to numbers.
+median_wait_numeric <- as.numeric(
+  trimws(as.character(median_wait_original))
+)
+
+# Identify values that could not be converted.
+conversion_issues <- rtt_data %>%
+  filter(
+    !is.na(median_wait_original),
+    is.na(median_wait_numeric)
+  ) %>%
+  select(
+    reporting_month,
+    provider_code,
+    specialty_code,
+    median_wait_weeks,
+    source_file
+  )
+
+# Display any conversion issues.
+nrow(conversion_issues)
+conversion_issues
+
+# Stop if conversion would lose an existing value.
+stopifnot(nrow(conversion_issues) == 0)
+
+# Apply the checked conversion.
+rtt_data$median_wait_weeks <- median_wait_numeric
+
+# Confirm the corrected type and numerical summary.
+class(rtt_data$median_wait_weeks)
+summary(rtt_data$median_wait_weeks)
+```
+
+## 5.2 Check Duplicate Records
+
+Each trust–specialty–month combination should appear once.
+We flag repeated combinations for investigation rather
+than deleting them automatically.
+
+```{r check-duplicates}
+duplicate_records <- rtt_data %>%
+  count(reporting_month, provider_code, specialty_code) %>%
+  filter(n > 1)
+```
+
+## 5.3 Check Missing Combinations
+
+We compare the observed records with all expected
+combinations of 24 months, three trusts and three specialties.
+
+```{r check-missing-combinations}
+expected_records <- expand_grid(
+  reporting_month = seq(
+    as.Date("2024-04-01"),
+    as.Date("2026-03-01"),
+    by = "month"
+  ),
+  provider_code = selected_trusts,
+  specialty_code = selected_specialties
+)
+
+missing_records <- expected_records %>%
+  anti_join(
+    rtt_data,
+    by = c("reporting_month", "provider_code", "specialty_code")
+  )
+
+unexpected_records <- rtt_data %>%
+  anti_join(
+    expected_records,
+    by = c("reporting_month", "provider_code", "specialty_code")
+  )
+```
+
+## 5.4 Check Missing Values
+
+Missing values are counted for every variable. They are
+not replaced with zero because missing and zero have
+different meanings.
+
+```{r check-missing-values}
+missing_values <- data.frame(
+  variable = names(rtt_data),
+  missing_count = as.integer(colSums(is.na(rtt_data)))
+)
+
+knitr::kable(
+  missing_values,
+  caption = "Missing values by variable"
+)
+```
+
+## 5.5 Summarise Record Coverage Checks
+
+```{r coverage-check-summary}
+coverage_checks <- data.frame(
+  check = c(
+    "Duplicate trust–specialty–month combinations",
+    "Missing expected combinations",
+    "Records outside the project scope"
+  ),
+  issues_found = c(
+    nrow(duplicate_records),
+    nrow(missing_records),
+    nrow(unexpected_records)
+  )
+)
+
+knitr::kable(
+  coverage_checks,
+  caption = "Record coverage checks"
+)
+```
+
+
+## 5.6 Validate Numerical Measures
+
+Counts should be non-negative whole numbers. Waiting-time
+proportions should lie between zero and one, and subgroup
+counts should not exceed total pathways.
+
+We also compare the published proportion within 18 weeks
+with the proportion calculated from its count and total.
+
+```{r validate-measures}
+# Small tolerance for numerical precision.
+tolerance <- 1e-8
+
+# Identify records with invalid numerical measures.
+invalid_records <- rtt_data %>%
+  filter(
+    !is.finite(total_pathways) |
+    !is.finite(within_18_weeks) |
+    !is.finite(over_52_weeks) |
+    !is.finite(pct_within_18_weeks) |
+    !is.finite(pct_over_52_weeks) |
+    !is.finite(median_wait_weeks) |
+    total_pathways < 0 |
+    within_18_weeks < 0 |
+    over_52_weeks < 0 |
+    total_pathways != floor(total_pathways) |
+    within_18_weeks != floor(within_18_weeks) |
+    over_52_weeks != floor(over_52_weeks) |
+    within_18_weeks > total_pathways |
+    over_52_weeks > total_pathways |
+    within_18_weeks + over_52_weeks > total_pathways |
+    pct_within_18_weeks < 0 |
+    pct_within_18_weeks > 1 |
+    pct_over_52_weeks < 0 |
+    pct_over_52_weeks > 1 |
+    median_wait_weeks < 0
+  )
+
+# Compare the published proportion with an independent calculation.
+percentage_mismatches <- rtt_data %>%
+  mutate(
+    calculated_proportion = within_18_weeks /
+      na_if(total_pathways, 0),
+    difference = abs(
+      pct_within_18_weeks - calculated_proportion
+    )
+  ) %>%
+  filter(
+    is.na(calculated_proportion) |
+    difference > tolerance
+  )
+
+# Display the validation results.
+numerical_checks <- data.frame(
+  check = c(
+    "Records with invalid numerical measures",
+    "Published 18-week proportion mismatches"
+  ),
+  issues_found = c(
+    nrow(invalid_records),
+    nrow(percentage_mismatches)
+  )
+)
+
+knitr::kable(
+  numerical_checks,
+  caption = "Numerical validation checks"
+)
+```
+
+```{r enforce-quality-checks}
+stopifnot(
+  nrow(duplicate_records) == 0,
+  nrow(missing_records) == 0,
+  nrow(unexpected_records) == 0,
+  all(missing_values$missing_count == 0),
+  nrow(invalid_records) == 0,
+  nrow(percentage_mismatches) == 0
+)
+```
+
+# 6. Calculating Performance Indicators
+
+## 6.1 Calculate Monthly and Annual Changes
+
+Changes are calculated separately for each trust and specialty,
+with records ordered by reporting month.
+
+Waiting-list changes are expressed as counts and percentages.
+Changes in waiting-time proportions are expressed in
+percentage points.
+
+```{r calculate-changes}
+rtt_analysis <- rtt_data %>%
+  group_by(provider_code, specialty_code) %>%
+  arrange(reporting_month, .by_group = TRUE) %>%
+  mutate(
+    # Change from the preceding month.
+    monthly_change_pathways =
+      total_pathways - lag(total_pathways),
+
+    monthly_change_pct =
+      100 * monthly_change_pathways /
+      na_if(lag(total_pathways), 0),
+
+    monthly_change_18wk_pp =
+      100 * (
+        pct_within_18_weeks -
+        lag(pct_within_18_weeks)
+      ),
+
+    # Change from the same month one year earlier.
+    annual_change_pathways =
+      total_pathways - lag(total_pathways, 12),
+
+    annual_change_pct =
+      100 * annual_change_pathways /
+      na_if(lag(total_pathways, 12), 0),
+
+    annual_change_18wk_pp =
+      100 * (
+        pct_within_18_weeks -
+        lag(pct_within_18_weeks, 12)
+      ),
+
+    annual_change_52wk_pp =
+      100 * (
+        pct_over_52_weeks -
+        lag(pct_over_52_weeks, 12)
+      )
+  ) %>%
+  ungroup() %>%
+  arrange(reporting_month, provider_code, specialty_code)
+```
+
+The first month of each series has no monthly comparison.
+The first 12 months have no annual comparison. These missing
+change values are expected because earlier observations
+are outside the study period.
+
+Using a 12-row lag represents one year here because our
+coverage checks confirmed one record per consecutive month
+for each trust–specialty combination.
+
+## 6.2 Inspect the Latest Annual Changes
+
+The table compares March 2026 with March 2025.
+
+```{r latest-annual-changes}
+latest_changes <- rtt_analysis %>%
+  filter(reporting_month == max(reporting_month)) %>%
+  select(
+    provider_code,
+    specialty_name,
+    total_pathways,
+    annual_change_pathways,
+    annual_change_pct,
+    annual_change_18wk_pp,
+    annual_change_52wk_pp
+  )
+
+knitr::kable(
+  latest_changes,
+  digits = 2,
+  col.names = c(
+    "Trust",
+    "Specialty",
+    "Pathways",
+    "Annual change",
+    "Annual change (%)",
+    "Within 18 weeks change (pp)",
+    "Over 52 weeks change (pp)"
+  ),
+  caption = "March 2026 compared with March 2025"
+)
+```
+
+# 7. Exploratory Analysis and Visualisation
+
+## 7.1 How Have Waiting-List Sizes Changed?
+
+We plot monthly incomplete pathways by trust, with a separate
+panel for each specialty. Counts represent month-end snapshots.
+
+```{r waiting-list-trends, fig.width=10, fig.height=7}
+# Create readable trust labels for charts.
+trust_labels <- c(
+  "R1H" = "Barts Health",
+  "RJ1" = "Guy's and St Thomas'",
+  "RYJ" = "Imperial College Healthcare"
+)
+
+ggplot(
+  rtt_analysis,
+  aes(
+    x = reporting_month,
+    y = total_pathways,
+    colour = provider_code,
+    group = provider_code
+  )
+) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 1.4) +
+  facet_wrap(
+    ~ specialty_name,
+    ncol = 1,
+    labeller = label_wrap_gen(width = 40)
+  ) +
+  scale_colour_manual(
+    values = c(
+      "R1H" = "#0072B2",
+      "RJ1" = "#D55E00",
+      "RYJ" = "#009E73"
+    ),
+    breaks = names(trust_labels),
+    labels = unname(trust_labels)
+  ) +
+  scale_x_date(
+    date_breaks = "6 months",
+    date_labels = "%b %Y"
+  ) +
+  scale_y_continuous(
+    labels = function(x) {
+      format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+    }
+  ) +
+  labs(
+    title = "Waiting-list trends by trust and specialty",
+    subtitle = "April 2024–March 2026",
+    x = NULL,
+    y = "Incomplete RTT pathways",
+    colour = NULL,
+    caption = paste(
+      "Source: NHS England monthly RTT Provider workbooks.",
+      "Pathways are not unique patients."
+    )
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+All panels use the same vertical scale to support comparison
+of waiting-list sizes. Differences in trust size and service
+mix should be considered when interpreting the counts.
+
+### Interpretation
+
+Barts Health recorded growth in General Surgery and Trauma
+and Orthopaedics waiting lists during much of 2025, followed
+by reductions towards March 2026. Imperial College Healthcare
+showed an overall decline across the three selected specialties.
+
+At Guy's and St Thomas', the General Surgery waiting list
+declined during 2024 before increasing during 2025. Its large
+March 2025–March 2026 percentage increase should therefore
+be considered alongside the relatively low starting count.
+
+These trends describe changes in month-end waiting-list
+sizes. They do not establish whether changes resulted from
+referral demand, treatment activity, administrative changes
+or other factors.
+
+
+## 7.2 How Has the Proportion Within 18 Weeks Changed?
+
+```{r within-18-week-trends, fig.width=10, fig.height=7}
+ggplot(
+  rtt_analysis,
+  aes(
+    x = reporting_month,
+    y = pct_within_18_weeks,
+    colour = provider_code,
+    group = provider_code
+  )
+) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 1.4) +
+  facet_wrap(
+    ~ specialty_name,
+    ncol = 1,
+    labeller = label_wrap_gen(width = 40)
+  ) +
+  scale_colour_manual(
+    values = c(
+      "R1H" = "#0072B2",
+      "RJ1" = "#D55E00",
+      "RYJ" = "#009E73"
+    ),
+    breaks = names(trust_labels),
+    labels = unname(trust_labels)
+  ) +
+  scale_x_date(
+    date_breaks = "6 months",
+    date_labels = "%b %Y"
+  ) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.2),
+    labels = function(x) paste0(round(x * 100), "%")
+  ) +
+  labs(
+    title = "Proportion of waiting pathways within 18 weeks",
+    subtitle = "April 2024–March 2026",
+    x = NULL,
+    y = "Incomplete pathways within 18 weeks (%)",
+    colour = NULL,
+    caption = "Source: NHS England monthly RTT Provider workbooks."
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+Higher values indicate a larger share of the month-end
+waiting list within 18 weeks. This is not the percentage
+of patients treated within 18 weeks during that month.
+
+### Interpretation
+
+General Surgery shows different patterns across the trusts.
+Imperial's proportion within 18 weeks increased over the
+study period. Guy's and St Thomas' improved into early 2025,
+then declined, with a marked fall around October 2025.
+This change warrants investigation alongside its growing
+waiting list; the chart alone cannot establish the cause.
+
+In Ophthalmology, Guy's and St Thomas' and Imperial ended
+the period with higher proportions within 18 weeks than
+at the start. Barts improved into 2025 before declining
+towards the end of the period.
+
+In Trauma and Orthopaedics, Guy's and St Thomas' and
+Imperial generally improved over the full period.
+Barts fluctuated and finished below the other two trusts.
+
+The count and proportion charts should be read together.
+Waiting-list growth can occur alongside an increase in
+the share within 18 weeks, as seen in Barts' annual
+General Surgery and Orthopaedics comparisons.
+
+## 7.3 How Has the Proportion Waiting Over 52 Weeks Changed?
+
+We examine long waits as a share of each specialty's
+month-end waiting list. A falling proportion does not
+necessarily mean the number of long-wait pathways fell,
+so counts will also be considered when interpreting results.
+
+```{r over-52-week-trends, fig.width=10, fig.height=7}
+ggplot(
+  rtt_analysis,
+  aes(
+    x = reporting_month,
+    y = pct_over_52_weeks,
+    colour = provider_code,
+    group = provider_code
+  )
+) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 1.4) +
+  facet_wrap(
+    ~ specialty_name,
+    ncol = 1,
+    labeller = label_wrap_gen(width = 40)
+  ) +
+  scale_colour_manual(
+    values = c(
+      "R1H" = "#0072B2",
+      "RJ1" = "#D55E00",
+      "RYJ" = "#009E73"
+    ),
+    breaks = names(trust_labels),
+    labels = unname(trust_labels)
+  ) +
+  scale_x_date(
+    date_breaks = "6 months",
+    date_labels = "%b %Y"
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0(round(x * 100, 1), "%"),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  expand_limits(y = 0) +
+  labs(
+    title = "Proportion of waiting pathways over 52 weeks",
+    subtitle = "April 2024–March 2026",
+    x = NULL,
+    y = "Incomplete pathways over 52 weeks (%)",
+    colour = NULL,
+    caption = "Source: NHS England monthly RTT Provider workbooks."
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+Lower values indicate a smaller share of pathways
+experiencing waits over 52 weeks. All panels use the
+same vertical scale.
+
+### Interpretation
+
+Imperial's General Surgery long-wait proportion fell from
+approximately 16% in April 2024 to below 1% by March 2026.
+Barts also ended the period substantially lower, although
+its proportion increased during part of 2025 before falling.
+
+In Trauma and Orthopaedics, all three trusts ended with
+lower long-wait proportions than at the start. Temporary
+increases show that the improvement was not continuous.
+
+Ophthalmology long-wait proportions remained comparatively
+low and approached zero towards the end of the period.
+The shared vertical scale makes smaller differences in
+this specialty less visible.
+
+These results describe proportions. Changes in the number
+of long-wait pathways must also be examined to distinguish
+a falling count from an increase in the total waiting list.
+
+# 8. Trust and Specialty Comparisons
+
+## 8.1 Compare the Latest Reporting Month
+
+We compare trusts within each specialty using waiting-list
+counts, waiting-time proportions and median waiting times.
+
+```{r latest-performance-table}
+latest_performance <- rtt_analysis %>%
+  filter(reporting_month == max(reporting_month)) %>%
+  arrange(specialty_code, provider_code) %>%
+  transmute(
+    Trust = unname(trust_labels[provider_code]),
+    Specialty = specialty_name,
+    Pathways = total_pathways,
+    `Within 18 weeks (%)` = 100 * pct_within_18_weeks,
+    `Over 52 weeks (count)` = over_52_weeks,
+    `Over 52 weeks (%)` = 100 * pct_over_52_weeks,
+    `Median wait (weeks)` = median_wait_weeks
+  )
+
+knitr::kable(
+  latest_performance,
+  digits = 2,
+  caption = "Selected specialty performance: March 2026"
+)
+```
+
+The comparisons are descriptive and are not adjusted for
+patient complexity or differences in service provision.
+They do not represent whole-trust performance.
+
+### Interpretation
+
+In March 2026, ophthalmology had the highest proportion of pathways
+within 18 weeks and the shortest median waiting time at each of the
+three selected trusts.
+
+For trauma and orthopaedics, Barts Health had the largest waiting list
+(8,564 pathways), the lowest proportion within 18 weeks (55.73%) and
+the longest median wait (15.83 weeks). However, Guy’s and St Thomas’
+had the highest number and proportion waiting over 52 weeks:
+80 pathways, representing 1.64% of its specialty waiting list.
+
+General surgery results were relatively close for the proportion
+within 18 weeks, ranging from 55.28% to 58.34%. The proportion waiting
+over 52 weeks varied more, from 0.10% at Imperial College Healthcare
+to 1.36% at Barts Health.
+
+These measures describe different parts of the waiting-time
+distribution. A shorter median wait does not necessarily mean fewer
+very long waits. Comparisons are descriptive and do not account for
+differences in case complexity, referral patterns or service provision.
+
+## 8.2 Changes in the Number of Long-Wait Pathways
+
+The previous chart showed the proportion of pathways waiting over
+52 weeks. This comparison examines the underlying counts between
+March 2025 and March 2026, alongside changes in those proportions.
+
+```{r annual-long-wait-comparison}
+# Calculate annual changes within each trust and specialty.
+long_wait_changes <- rtt_analysis %>%
+  group_by(provider_code, specialty_code) %>%
+  arrange(reporting_month, .by_group = TRUE) %>%
+  mutate(
+    previous_year_over_52 = lag(over_52_weeks, 12),
+    annual_change_over_52 = over_52_weeks - previous_year_over_52
+  ) %>%
+  ungroup()
+
+# Display the latest month and its comparison with one year earlier.
+long_wait_comparison <- long_wait_changes %>%
+  filter(reporting_month == max(reporting_month)) %>%
+  arrange(specialty_code, provider_code) %>%
+  transmute(
+    Trust = unname(trust_labels[provider_code]),
+    Specialty = specialty_name,
+    `Over 52 weeks: March 2025` = previous_year_over_52,
+    `Over 52 weeks: March 2026` = over_52_weeks,
+    `Change in count` = annual_change_over_52,
+    `Change in proportion (pp)` = annual_change_52wk_pp
+  )
+
+knitr::kable(
+  long_wait_comparison,
+  digits = 2,
+  caption = "Pathways waiting over 52 weeks: March 2025 to March 2026"
+)
+```
+
+### Interpretation
+
+Between March 2025 and March 2026, the number and proportion of
+pathways waiting over 52 weeks decreased in every selected
+trust–specialty combination.
+
+Imperial College Healthcare recorded the largest absolute reduction
+in general surgery, from 121 to 2 pathways. Barts Health recorded
+the largest absolute reduction in trauma and orthopaedics, from
+181 to 72 pathways.
+
+Guy’s and St Thomas’ recorded a smaller reduction in orthopaedics,
+from 86 to 80 pathways. In March 2026, this remained the highest
+long-wait count and proportion among the three selected trusts
+for that specialty.
+
+These are changes in month-end snapshots. They do not establish
+whether pathways left the waiting list through treatment, other
+removals or reporting changes.
+
+## 8.3 Summary Heatmap of Annual Changes
+
+These heatmaps summarise changes between March 2025 and March 2026
+across the selected trusts and specialties. Labels show the exact
+change, rounded to two decimal places.
+
+Each panel uses its own colour scale. Waiting-list changes are
+expressed as percentages; changes in waiting-time proportions
+are expressed in percentage points (pp).
+
+```{r annual-summary-heatmaps, fig.width=10, fig.height=4.5}
+# Select the latest reporting month.
+heatmap_data <- rtt_analysis %>%
+  filter(reporting_month == max(reporting_month)) %>%
+  mutate(
+    trust = factor(
+      provider_code,
+      levels = c("RYJ", "RJ1", "R1H"),
+      labels = c(
+        "Imperial College Healthcare",
+        "Guy's and St Thomas'",
+        "Barts Health"
+      )
+    ),
+    specialty = factor(
+      specialty_code,
+      levels = c("C_100", "C_110", "C_130"),
+      labels = c(
+        "General\nsurgery",
+        "Trauma and\northopaedics",
+        "Ophthalmology"
+      )
+    )
+  )
+
+# Create one heatmap for a specified measure.
+make_change_heatmap <- function(data, measure, title, unit,
+                                higher_is_favourable = FALSE) {
+
+  plot_data <- data %>%
+    mutate(
+      change = .data[[measure]],
+      cell_label = sprintf("%+.2f", change)
+    )
+
+  # Centre the colour scale on zero with symmetric limits.
+  colour_limit <- max(abs(plot_data$change), na.rm = TRUE)
+
+  if (colour_limit == 0) {
+    colour_limit <- 1
+  }
+
+  # For within-18-week performance, increases are favourable.
+  # For waiting-list size and over-52-week share, decreases
+  # are treated as the favourable direction.
+  low_colour <- if (higher_is_favourable) "#D55E00" else "#0072B2"
+  high_colour <- if (higher_is_favourable) "#0072B2" else "#D55E00"
+
+  ggplot(plot_data, aes(x = specialty, y = trust, fill = change)) +
+    geom_tile(colour = "white", linewidth = 1) +
+    geom_text(
+      aes(label = cell_label),
+      colour = "black",
+      size = 4.5,
+      fontface = "bold"
+    ) +
+    scale_fill_gradient2(
+      low = low_colour,
+      mid = "white",
+      high = high_colour,
+      midpoint = 0,
+      limits = c(-colour_limit, colour_limit),
+      name = unit
+    ) +
+    labs(
+      title = title,
+      subtitle = "March 2026 compared with March 2025",
+      x = NULL,
+      y = NULL,
+      caption = paste(
+        "Blue: favourable direction | Orange: adverse direction",
+        "Separate colour scale for each panel.",
+        sep = "\n"
+      )
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_text(colour = "black"),
+      plot.title = element_text(face = "bold"),
+      plot.caption = element_text(hjust = 0),
+      legend.position = "right"
+    )
+}
+
+# Print each panel separately so labels remain readable.
+print(make_change_heatmap(
+  heatmap_data,
+  measure = "annual_change_pct",
+  title = "A. Change in waiting-list size",
+  unit = "Change (%)"
+))
+
+print(make_change_heatmap(
+  heatmap_data,
+  measure = "annual_change_18wk_pp",
+  title = "B. Change within 18 weeks",
+  unit = "Change (pp)",
+  higher_is_favourable = TRUE
+))
+
+print(make_change_heatmap(
+  heatmap_data,
+  measure = "annual_change_52wk_pp",
+  title = "C. Change over 52 weeks",
+  unit = "Change (pp)"
+))
+```
+
+### Interpretation
+
+The heatmaps show different patterns across the three indicators.
+Waiting-list size increased in five of the nine combinations,
+while the proportion within 18 weeks improved in seven.
+The proportion waiting over 52 weeks decreased in all nine.
+
+General surgery at Guy’s and St Thomas’ and ophthalmology at
+Barts Health combined waiting-list growth with a declining
+proportion within 18 weeks. Imperial College Healthcare recorded
+smaller lists and improvements in both waiting-time proportions
+across all three selected specialties.
+
+Colour intensity should be compared within each panel, rather
+than across panels, because the measures have separate scales.
+A smaller waiting list is treated here as a favourable direction,
+but its causes require investigation: reductions may reflect
+treatment, other removals or changes in referrals or reporting.
+
+# 9. Key Findings and Recommendations
+
+## 9.1 Key Findings
+
+### Long waits reduced across all selected services
+
+All nine trust–specialty combinations recorded fewer pathways
+waiting over 52 weeks in March 2026 than in March 2025. The
+proportion waiting over 52 weeks also fell in every combination.
+However, improvements in very long waits did not always coincide
+with improvements in the proportion within 18 weeks.
+
+### General surgery at Guy’s and St Thomas’ warrants investigation
+
+The general surgery waiting list increased from 782 to 1,486
+pathways between March 2025 and March 2026, an increase of 90.03%.
+Over the same period, the proportion within 18 weeks fell by
+16.34 percentage points.
+
+The large percentage increase should be interpreted alongside
+the relatively small March 2025 baseline. Although pathways
+waiting over 52 weeks decreased from 15 to 8, the broader
+waiting-time measures indicate a need for further investigation.
+
+### Barts Health ophthalmology showed growing waiting-list pressure
+
+The ophthalmology waiting list increased by 1,000 pathways
+(21.82%) between March 2025 and March 2026. The proportion
+within 18 weeks fell by 4.79 percentage points, despite a reduction
+in pathways waiting over 52 weeks from 18 to 3.
+
+This combination illustrates why monitoring very long waits
+alone would provide an incomplete picture of service performance.
+
+### Orthopaedics presents different priorities across trusts
+
+Barts Health had the largest orthopaedic waiting list in March
+2026, with 8,564 pathways, and the lowest proportion within
+18 weeks among the selected trusts, at 55.73%.
+
+Guy’s and St Thomas’ had a higher proportion within 18 weeks,
+at 65.04%, but also the highest count and proportion waiting
+over 52 weeks: 80 pathways and 1.64%. These results suggest
+different areas for operational review.
+
+### Imperial College Healthcare showed consistent annual improvement
+
+Across all three selected specialties, Imperial College Healthcare
+recorded smaller waiting lists, higher proportions within 18 weeks
+and fewer pathways waiting over 52 weeks in March 2026 than
+in March 2025.
+
+These findings describe observed changes and do not establish
+their causes.
+
+## 9.2 Recommendations for Further Investigation
+
+1. **Investigate general surgery at Guy’s and St Thomas’.**
+   Review monthly referrals, completed pathways, other removals
+   and reporting changes to understand the waiting-list growth
+   and decline in the proportion within 18 weeks.
+
+2. **Review ophthalmology demand and activity at Barts Health.**
+   Compare additions to the waiting list with pathway completions
+   to investigate the growing list and lower proportion within
+   18 weeks.
+
+3. **Review orthopaedic waiting-time bands.**
+   At Barts Health, examine the distribution of pathways beyond
+   18 weeks. At Guy’s and St Thomas’, investigate the remaining
+   pathways waiting over 52 weeks.
+
+4. **Monitor several indicators together.**
+   Track total pathways, the proportion within 18 weeks, median
+   waiting time, and both the count and proportion waiting over
+   52 weeks. Interpret these alongside monthly and annual changes.
+
+5. **Validate explanations with operational teams.**
+   Discuss the findings with service managers and analysts before
+   attributing changes to capacity, demand or service improvements.
+   Aggregate RTT snapshots cannot determine the causes on their own.
+   
+# 10. Limitations and Conclusion
+
+## 10.1 Limitations
+
+- **Selected services only.** The analysis covers three specialties
+  at three trusts. Findings cannot be generalised to whole-trust
+  performance or the NHS nationally.
+
+- **Pathways rather than unique patients.** A patient may have more
+  than one referral-to-treatment pathway. Waiting-list counts
+  therefore do not represent unique people.
+
+- **Monthly snapshots.** Each observation represents pathways
+  waiting at the end of a reporting month. Adding counts across
+  months would count some pathways repeatedly.
+
+- **Descriptive comparisons.** Differences between trusts are not
+  adjusted for case complexity, referral patterns, population needs
+  or service provision. They should not be treated as an overall
+  ranking of care quality.
+
+- **Causes cannot be established.** These data do not explain
+  whether changes resulted from referrals, treatment activity,
+  other pathway removals or reporting changes.
+
+- **Published data may be revised.** Results reflect the downloaded
+  workbooks used in this project. Subsequent NHS England revisions
+  may change historical values. Source filenames are retained
+  to support traceability.
+
+- **Limited observation period.** Twenty-four months support
+  descriptive trend analysis but provide limited evidence about
+  longer-term patterns or recurring seasonality.
+
+- **Median waits do not describe the entire distribution.**
+  Median waiting times are interpreted alongside the 18-week and
+  52-week measures. Specialty medians are not averaged to estimate
+  an overall trust median.
+
+## 10.2 Conclusion
+
+This project analysed 216 monthly trust–specialty observations
+between April 2024 and March 2026. Checks identified no missing
+expected records, duplicate combinations, missing values in the
+selected variables or numerical inconsistencies under the
+validation rules applied.
+
+Between March 2025 and March 2026, both the number and proportion
+of pathways waiting over 52 weeks fell in all nine selected
+trust–specialty combinations. However, other indicators showed
+a mixed picture. General surgery at Guy’s and St Thomas’ and
+ophthalmology at Barts Health combined waiting-list growth with
+a declining proportion of pathways within 18 weeks.
+
+The findings demonstrate the value of examining waiting-list size,
+typical waiting time and long waits together. They identify areas
+for further investigation rather than establish the causes of
+performance changes.
+
+# 11. Sources and Reproducibility
+
+## 11.1 Data Sources
+
+The analysis uses NHS England's monthly incomplete
+referral-to-treatment provider workbooks, using the `Provider`
+worksheet.
+
+- [NHS England RTT data: 2024–25](https://www.england.nhs.uk/statistics/statistical-work-areas/rtt-waiting-times/rtt-data-2024-25/)
+- [NHS England RTT data: 2025–26](https://www.england.nhs.uk/statistics/statistical-work-areas/rtt-waiting-times/rtt-data-2025-26/)
+
+The selected reporting months run from April 2024 to March 2026.
+Original workbooks are retained in the project's `data` folder.
+
+## 11.2 Source File Record
+
+The following table links each reporting month to the workbook
+used in the analysis.
+
+```{r source-file-record}
+source_file_record <- rtt_data %>%
+  distinct(reporting_month, source_file) %>%
+  arrange(reporting_month)
+
+knitr::kable(
+  source_file_record,
+  caption = "Source workbooks used for each reporting month"
+)
+```
+
+## 11.3 Reproducing the Report
+
+To reproduce the analysis:
+
+1. Open the RStudio project.
+2. Ensure the 24 source workbooks are in the `data` folder.
+3. Install the required packages: `readxl`, `dplyr`, `tidyr`,
+   `ggplot2`, `knitr` and `rmarkdown`.
+4. Knit this R Markdown file to HTML.
+
+The report imports the workbooks, selects the project scope,
+validates the data, calculates indicators and generates the
+tables and charts.
+
+## 11.4 Software Environment
+
+The output below records the R version, platform and loaded
+package versions used when rendering this report.
+
+```{r session-information}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
